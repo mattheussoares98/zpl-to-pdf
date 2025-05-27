@@ -79,11 +79,17 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  int countLabels(String zpl) {
+    final matches = RegExp(
+      r'\^XA',
+      caseSensitive: false,
+    ).allMatches(zpl).toList();
+    print('Found ^XA ${matches.length} times');
+    return matches.length;
+  }
+
   Future<void> convertFile(File file) async {
     try {
-      // Read file content
-      final fileContent = await file.readAsString();
-
       var headers = {
         'Accept': 'application/pdf',
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -91,9 +97,12 @@ class _MyHomePageState extends State<MyHomePage> {
 
       var request = http.Request(
         'POST',
-        Uri.parse('http://api.labelary.com/v1/printers/8dpmm/labels/3.15x0.98/0/'),
+        Uri.parse(
+          'http://api.labelary.com/v1/printers/8dpmm/labels/3.15x0.98/0/',
+        ),
       );
 
+      final fileContent = await file.readAsString();
       request.body = fileContent; // Put file content here
       request.headers.addAll(headers);
 
@@ -105,11 +114,14 @@ class _MyHomePageState extends State<MyHomePage> {
             .replaceAll(RegExp(r'.txt'), '');
 
         debugPrint('File name: $fileName');
+        int quantities = countLabels(fileContent);
         final bytes = await response.stream.toBytes();
 
-        final fileOut = File('$destinyPath/$fileName.pdf');
-        await fileOut.writeAsBytes(bytes);
-        debugPrint('PDF saved to: ${fileOut.path}');
+        for (var i = 0; i < quantities; i++) {
+          final fileOut = File('$destinyPath/$fileName-${i + 1}.pdf');
+          await fileOut.writeAsBytes(bytes);
+          debugPrint('PDF saved to: ${fileOut.path}');
+        }
 
         filesSucceeds.add('${file.path}.pdf');
       } else {
