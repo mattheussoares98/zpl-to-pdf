@@ -1,11 +1,7 @@
 // ignore_for_file: use_build_context_synchronously
 
-import 'dart:io';
-
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:path/path.dart' as path;
+import 'package:zpl_to_pdf/helper.dart';
 
 void main() {
   runApp(const MyApp());
@@ -40,6 +36,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool isLoading = false;
   List<String> filesSucceeds = [];
   List<String> filesWithErrors = [];
+  List<String> generatedPdfs = [];
 
   String get originPath {
     if (_originPath == null) {
@@ -57,112 +54,6 @@ class _MyHomePageState extends State<MyHomePage> {
     } else {
       return _originPath!;
     }
-  }
-
-  Future<String?> selectFolder() async {
-    final String? directoryPath = await getDirectoryPath(
-      confirmButtonText: 'Confirmar',
-    );
-
-    if (directoryPath != null) {
-      return directoryPath;
-    }
-
-    showSnackBar('Nenhuma pasta selecionada');
-    return null;
-  }
-
-  void showSnackBar(String message) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
-  }
-
-  int countLabels(String zpl) {
-    final matches = RegExp(
-      r'\^XA',
-      caseSensitive: false,
-    ).allMatches(zpl).toList();
-    print('Found ^XA ${matches.length} times');
-    return matches.length;
-  }
-
-  Future<void> convertFile(File file) async {
-    try {
-      var headers = {
-        'Accept': 'application/pdf',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      };
-
-      var request = http.Request(
-        'POST',
-        Uri.parse(
-          'http://api.labelary.com/v1/printers/8dpmm/labels/3.15x0.98/0/',
-        ),
-      );
-
-      final fileContent = await file.readAsString();
-      request.body = fileContent; // Put file content here
-      request.headers.addAll(headers);
-
-      http.StreamedResponse response = await request.send();
-
-      if (response.statusCode == 200) {
-        final fileName = path
-            .basename(file.path)
-            .replaceAll(RegExp(r'.txt'), '');
-
-        debugPrint('File name: $fileName');
-        int quantities = countLabels(fileContent);
-        final bytes = await response.stream.toBytes();
-
-        for (var i = 0; i < quantities; i++) {
-          final fileOut = File('$destinyPath/$fileName-${i + 1}.pdf');
-          await fileOut.writeAsBytes(bytes);
-          debugPrint('PDF saved to: ${fileOut.path}');
-        }
-
-        filesSucceeds.add('${file.path}.pdf');
-      } else {
-        debugPrint('Error: ${response.statusCode} - ${response.reasonPhrase}');
-        filesWithErrors.add(file.path);
-      }
-    } catch (e) {
-      debugPrint('Exception: $e');
-    }
-  }
-
-  Future<void> convertPath(String path) async {
-    final directory = Directory(path);
-
-    setState(() {
-      isLoading = true;
-      filesSucceeds = [];
-      filesWithErrors = [];
-    });
-
-    if (directory.existsSync()) {
-      final files = directory.listSync(
-        recursive: false,
-      ); // `true` to list all subfolders recursively
-
-      for (final fileEntity in files) {
-        if (fileEntity is File && fileEntity.path.endsWith("txt")) {
-          debugPrint('File: ${fileEntity.path}');
-
-          await convertFile(fileEntity);
-        } else if (fileEntity is Directory) {
-          debugPrint('only a directory: ${fileEntity.path}');
-        }
-      }
-    } else {
-      debugPrint('Directory does not exist');
-    }
-
-    setState(() {
-      isLoading = false;
-    });
   }
 
   @override
@@ -195,7 +86,9 @@ class _MyHomePageState extends State<MyHomePage> {
                             ),
                             ElevatedButton(
                               onPressed: () async {
-                                _originPath = await selectFolder();
+                                _originPath = await Helper.selectFolder(
+                                  context,
+                                );
                                 setState(() {});
                               },
                               child: Text("Alterar origem"),
@@ -209,7 +102,9 @@ class _MyHomePageState extends State<MyHomePage> {
                             Text(destinyPath),
                             ElevatedButton(
                               onPressed: () async {
-                                _destinyPath = await selectFolder();
+                                _destinyPath = await Helper.selectFolder(
+                                  context,
+                                );
                                 setState(() {});
                               },
                               child: Text("Alterar destino (opcional)"),
@@ -225,7 +120,19 @@ class _MyHomePageState extends State<MyHomePage> {
                       onPressed: _originPath == null
                           ? null
                           : () async {
-                              await convertPath(_originPath!);
+                              await Helper.convertPath(
+                                path: _originPath!,
+                                destinyPath: destinyPath,
+                                context: context,
+                                changeIsLoading: (value) {
+                                  setState(() {
+                                    isLoading = value;
+                                  });
+                                },
+                                generatedPdfs: generatedPdfs,
+                                filesSucceeds: filesSucceeds,
+                                filesWithErrors: filesWithErrors,
+                              );
                             },
                       child: Text("Converter"),
                     ),
