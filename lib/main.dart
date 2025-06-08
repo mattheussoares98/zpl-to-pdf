@@ -121,7 +121,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           ? null
                           : () async {
                               await Helper.convertPath(
-                                path: _originPath!,
+                                originPath: originPath,
                                 destinyPath: destinyPath,
                                 context: context,
                                 changeIsLoading: (value) {
@@ -129,9 +129,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                     isLoading = value;
                                   });
                                 },
-                                generatedPdfs: generatedPdfs,
-                                filesSucceeds: filesSucceeds,
-                                filesWithErrors: filesWithErrors,
                               );
                             },
                       child: Text("Converter"),
